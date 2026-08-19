@@ -4,14 +4,14 @@ import requests
 st.set_page_config(page_title="Ugandan Multilingual Translator", page_icon="🇺🇬")
 st.title("Ugandan Multilingual Translator")
 
-# FLORES-200 Language Codes used by Sunbird AI
+# Language choices mapping
 LANGUAGES = {
-    "English": "eng_Latn",
-    "Runyankole": "nyn_Latn",
-    "Luganda": "lug_Latn",
-    "Acholi": "ach_Latn",
-    "Ateso": "teo_Latn",
-    "Lugbara": "lgg_Latn"
+    "English": "English",
+    "Runyankole": "Runyankole",
+    "Luganda": "Luganda",
+    "Acholi": "Acholi",
+    "Ateso": "Ateso",
+    "Lugbara": "Lugbara"
 }
 
 col1, col2 = st.columns(2)
@@ -28,22 +28,32 @@ if st.button("Translate", type="primary"):
     else:
         with st.spinner("Translating..."):
             try:
-                # Direct API call to Sunbird's hosted translation server
-                url = "https://api.sunbird.ai/tasks/process"
-                payload = {
-                    "action": "translate",
-                    "text": input_text,
-                    "source_language": LANGUAGES[source_lang],
-                    "target_language": LANGUAGES[target_lang]
+                # Sunbird API endpoints
+                url = "https://api.sunbird.ai/tasks/translate"
+                
+                headers = {
+                    "Content-Type": "application/json"
                 }
                 
-                response = requests.post(url, json=payload, timeout=15)
-                
+                # Attach token if you created one via Sunbird API
+                if "SUNBIRD_API_KEY" in st.secrets:
+                    headers["Authorization"] = f"Bearer {st.secrets['SUNBIRD_API_KEY']}"
+
+                payload = {
+                    "source_language": LANGUAGES[source_lang],
+                    "target_language": LANGUAGES[target_lang],
+                    "text": input_text
+                }
+
+                response = requests.post(url, json=payload, headers=headers, timeout=15)
+
                 if response.status_code == 200:
-                    translation = response.json().get("text", "")
+                    data = response.json()
+                    # Handles various payload key formats
+                    translation = data.get("text") or data.get("translated_text") or str(data)
                     st.subheader("Translation:")
                     st.success(translation)
                 else:
-                    st.error(f"Translation API returned status code {response.status_code}. Try again shortly.")
+                    st.error(f"API Error ({response.status_code}): {response.text}")
             except Exception as e:
                 st.error(f"Connection Error: {str(e)}")
