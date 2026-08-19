@@ -1,63 +1,49 @@
 import streamlit as st
-import torch
-import transformers
+import requests
 
 st.set_page_config(page_title="Ugandan Multilingual Translator", page_icon="🇺🇬")
 st.title("Ugandan Multilingual Translator")
 
-# 4-bit quantized Sunbird model fits within memory limits
-MODEL_NAME = "Sunbird/translate-nllb-1.3b-salt-4bit"
-TOKENIZER_NAME = "Sunbird/translate-nllb-1.3b-salt"
-
-@st.cache_resource
-def load_translation_engine():
-    tokenizer = transformers.NllbTokenizer.from_pretrained(TOKENIZER_NAME)
-    model = transformers.M2M100ForConditionalGeneration.from_pretrained(
-        MODEL_NAME, 
-        device_map="auto",
-        load_in_4bit=True
-    )
-    return tokenizer, model
-
-with st.spinner("Loading lightweight translation engine..."):
-    tokenizer, model = load_translation_engine()
-
-LANG_TOKENS = {
-    "English": 256047,
-    "Runyankole": 256002,
-    "Luganda": 256110,
-    "Acholi": 256111,
-    "Ateso": 256006,
-    "Lugbara": 256008,
+# FLORES-200 Language Codes used by Sunbird AI
+LANGUAGES = {
+    "English": "eng_Latn",
+    "Runyankole": "nyn_Latn",
+    "Luganda": "lug_Latn",
+    "Acholi": "ach_Latn",
+    "Ateso": "teo_Latn",
+    "Lugbara": "lgg_Latn"
 }
 
 col1, col2 = st.columns(2)
 with col1:
-    src_name = st.selectbox("From:", list(LANG_TOKENS.keys()), index=0)
+    source_lang = st.selectbox("From:", list(LANGUAGES.keys()), index=0)
 with col2:
-    tgt_name = st.selectbox("To:", list(LANG_TOKENS.keys()), index=1)
+    target_lang = st.selectbox("To:", list(LANGUAGES.keys()), index=1)
 
 input_text = st.text_area("Enter text to translate:", height=120)
 
 if st.button("Translate", type="primary"):
     if not input_text.strip():
-        st.warning("Please enter text first.")
+        st.warning("Please enter text before translating.")
     else:
         with st.spinner("Translating..."):
             try:
-                device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-                inputs = tokenizer(input_text, return_tensors="pt").to(device)
-                inputs['input_ids'][0][0] = LANG_TOKENS[src_name]
-
-                translated_tokens = model.generate(
-                    **inputs,
-                    forced_bos_token_id=LANG_TOKENS[tgt_name],
-                    max_length=128,
-                    num_beams=3
-                )
+                # Direct API call to Sunbird's hosted translation server
+                url = "https://api.sunbird.ai/tasks/process"
+                payload = {
+                    "action": "translate",
+                    "text": input_text,
+                    "source_language": LANGUAGES[source_lang],
+                    "target_language": LANGUAGES[target_lang]
+                }
                 
-                result = tokenizer.batch_decode(translated_tokens, skip_special_tokens=True)[0]
-                st.subheader("Translation:")
-                st.success(result)
+                response = requests.post(url, json=payload, timeout=15)
+                
+                if response.status_code == 200:
+                    translation = response.json().get("text", "")
+                    st.subheader("Translation:")
+                    st.success(translation)
+                else:
+                    st.error(f"Translation API returned status code {response.status_code}. Try again shortly.")
             except Exception as e:
-                st.error(f"Execution Error: {str(e)}")
+                st.error(f"Connection Error: {str(e)}")
