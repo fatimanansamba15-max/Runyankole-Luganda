@@ -1,18 +1,20 @@
 import streamlit as st
 import torch
 import transformers
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
 st.set_page_config(page_title="Ugandan Multilingual Translator", page_icon="🇺🇬")
 st.title("Ugandan Multilingual Translator")
 
-# Official Sunbird NLLB model endpoint
 MODEL_NAME = "Sunbird/translate-nllb-1.3b-salt"
 
 @st.cache_resource
 def load_translation_engine():
     """Loads and caches tokenizer and model weights into RAM."""
-    tokenizer = transformers.NllbTokenizer.from_pretrained(MODEL_NAME)
-    model = transformers.M2M100ForConditionalGeneration.from_pretrained(MODEL_NAME)
+    # Use AutoTokenizer instead of NllbTokenizer
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+    model = AutoModelForSeq2SeqLM.from_pretrained(MODEL_NAME)
+    
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
     return tokenizer, model, device
