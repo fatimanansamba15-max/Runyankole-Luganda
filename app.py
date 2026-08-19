@@ -5,12 +5,12 @@ from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 st.set_page_config(page_title="Ugandan Languages Translator", page_icon="🇺🇬")
 st.title("Ugandan Multilingual Translator")
 
-# Optimized 600M distilled NLLB model that fits within Streamlit Cloud's 1 GB RAM limit
+# Optimized distilled model for free Streamlit Cloud RAM limits
 MODEL_NAME = "facebook/nllb-200-distilled-600M"
 
 @st.cache_resource
 def load_translation_engine():
-    """Loads and caches the model and tokenizer into memory."""
+    """Loads and caches tokenizer and model weights into RAM."""
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
     model = AutoModelForSeq2SeqLM.from_pretrained(MODEL_NAME)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -20,7 +20,7 @@ def load_translation_engine():
 with st.spinner("Loading translation engine into memory..."):
     tokenizer, model, device = load_translation_engine()
 
-# Standard FLORES-200 language codes used by NLLB
+# Standard NLLB language codes
 LANGUAGES = {
     "English": "eng_Latn",
     "Runyankole": "nyn_Latn",
@@ -44,16 +44,16 @@ if st.button("Translate", type="primary"):
 
         with st.spinner("Translating..."):
             try:
-                # Set source language context on the tokenizer
+                # Set source language context
                 tokenizer.src_lang = src_code
                 
-                # Tokenize the input string
+                # Tokenize input text
                 inputs = tokenizer(input_text, return_tensors="pt").to(device)
                 
-                # Get the forced target language token ID
-                forced_bos_id = tokenizer.lang_code_to_id[tgt_code]
+                # Fetch target language token ID using convert_tokens_to_ids
+                forced_bos_id = tokenizer.convert_tokens_to_ids(tgt_code)
                 
-                # Generate translation tokens
+                # Generate translation
                 translated_tokens = model.generate(
                     **inputs,
                     forced_bos_token_id=forced_bos_id,
@@ -61,7 +61,7 @@ if st.button("Translate", type="primary"):
                     num_beams=4
                 )
                 
-                # Decode output back into plain text
+                # Decode outputs back to text
                 result = tokenizer.batch_decode(translated_tokens, skip_special_tokens=True)[0]
                 
                 st.subheader("Translation:")
